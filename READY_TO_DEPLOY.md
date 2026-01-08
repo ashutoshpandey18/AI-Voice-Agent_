@@ -66,9 +66,9 @@ git commit -m "fix: remove .env files from tracking"
    ```
    NODE_ENV=production
    PORT=5000
-   MONGO_URI=mongodb+srv://ashutoshpandey23june2005_db_user:PRMZKWiiZNGqIotR@aivoiceagent.iaidsbf.mongodb.net/?retryWrites=true&w=majority&appName=AIVoiceAgent
-   OPENWEATHER_API_KEY=ad06f3345ac341f255f9c899667f61e7
-   JWT_SECRET=a8f3e9c2b7d1f4e6a9c3b8d2f7e1a4c9b6d3f8e2a7c1b9d4f6e3a8c2b7d1f5e9
+   MONGO_URI=your_mongodb_atlas_connection_string_here
+   OPENWEATHER_API_KEY=your_openweather_api_key_here
+   JWT_SECRET=your_random_64_character_jwt_secret_here
    JWT_EXPIRES_IN=24h
    ALLOW_SEED=false
    FRONTEND_URL=https://TEMP-VALUE-UPDATE-AFTER-VERCEL-DEPLOY
