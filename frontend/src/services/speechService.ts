@@ -39,20 +39,43 @@ class SpeechService {
     if (!this.recognition) return;
 
     // Configure recognition behavior
-    this.recognition.continuous = false;  // One utterance at a time
-    this.recognition.interimResults = false;  // Only final results
+    this.recognition.continuous = true;  // Keep listening continuously
+    this.recognition.interimResults = true;  // Show interim results
     this.recognition.lang = 'en-US';
+    this.recognition.maxAlternatives = 1;
 
     // Add start event to confirm mic is active
     this.recognition.onstart = () => {
       console.log('[SpeechService] ✓ Microphone is now actively listening');
     };
 
+    // Add audio start event to confirm voice detection
+    this.recognition.onaudiostart = () => {
+      console.log('[SpeechService] ✓ Audio input detected');
+    };
+
+    // Add sound start event
+    this.recognition.onsoundstart = () => {
+      console.log('[SpeechService] ✓ Sound detected');
+    };
+
+    // Add speech start event
+    this.recognition.onspeechstart = () => {
+      console.log('[SpeechService] ✓ Speech detected');
+    };
+
     // Use event.resultIndex to get the correct result
     this.recognition.onresult = (event: SpeechRecognitionEvent) => {
-      const transcript = event.results[event.resultIndex][0].transcript.trim();
+      const result = event.results[event.resultIndex];
+      const transcript = result[0].transcript.trim();
+      const isFinal = result.isFinal;
 
-      console.log('[SpeechService] Speech result:', transcript);
+      console.log('[SpeechService] Speech result:', transcript, 'isFinal:', isFinal);
+
+      // Only process final results
+      if (!isFinal) {
+        return;
+      }
 
       // Never send empty or undefined messages
       if (!transcript || transcript.length === 0) {
@@ -109,16 +132,12 @@ class SpeechService {
           // Double-check before restart
           if (!this.isSpeaking && !this.synthesis.speaking && this.autoMode) {
             try {
-              // Clear last transcript to allow new input after restart
-              this.lastTranscript = '';
-              this.lastTranscriptTime = 0;
-
               this.startListening(this.onResultCallback!, this.onErrorCallback || undefined);
             } catch (error) {
               console.log('[SpeechService] Error auto-restarting (ignored):', error);
             }
           }
-        }, 400);  // 400ms delay prevents overlap
+        }, 300);  // 300ms delay prevents overlap
       }
     };
   }
@@ -134,12 +153,54 @@ class SpeechService {
    * Start listening for speech input
    * Prevents start if TTS is currently speaking
    */
-  startListening(
+  async startListening(
     onResult: (transcript: string) => void,
     onError?: (error: string) => void
-  ): void {
+  ): Promise<void> {
     if (!this.recognition) {
       onError?.('Speech recognition not supported');
+      return;
+    }
+
+    // Check microphone permissions first
+    try {
+      console.log('[SpeechService] Requesting microphone permissions...');
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      console.log('[SpeechService] ✓ Microphone permission granted');
+
+      // Test if microphone is actually working
+      const audioContext = new AudioContext();
+      const analyser = audioContext.createAnalyser();
+      const microphone = audioContext.createMediaStreamSource(stream);
+      microphone.connect(analyser);
+      analyser.fftSize = 256;
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+      // Check audio levels for 1 second
+      let maxVolume = 0;
+      const checkAudio = () => {
+        analyser.getByteFrequencyData(dataArray);
+        const volume = dataArray.reduce((a, b) => a + b) / dataArray.length;
+        maxVolume = Math.max(maxVolume, volume);
+      };
+
+      const checkInterval = setInterval(checkAudio, 100);
+      setTimeout(() => {
+        clearInterval(checkInterval);
+        console.log('[SpeechService] Microphone test - Max volume detected:', maxVolume);
+        if (maxVolume < 1) {
+          console.warn('[SpeechService] ⚠️ WARNING: Microphone volume extremely low or zero!');
+          console.warn('[SpeechService] Please check: 1) Mic not muted 2) Correct mic selected in Windows 3) Mic volume level');
+        }
+        audioContext.close();
+      }, 1000);
+
+      // Stop the test stream (actual recognition will use its own)
+      stream.getTracks().forEach(track => track.stop());
+
+    } catch (error: any) {
+      console.error('[SpeechService] ✗ Microphone permission denied or unavailable:', error);
+      onError?.('Microphone access denied. Please allow microphone permissions in your browser.');
       return;
     }
 

@@ -1,4 +1,5 @@
 import express from 'express';
+import { authenticate } from '../middleware/auth';
 import {
   getBookings,
   getBookingById,
@@ -16,10 +17,14 @@ const router = express.Router();
 /**
  * Admin Routes
  * All routes are prefixed with /api/admin
+ * All routes require authentication
  */
 
 // Apply admin rate limiter to all admin routes
 router.use(adminLimiter);
+
+// Apply authentication to all routes
+router.use(authenticate);
 
 // Bookings routes
 router.get('/bookings', getBookings);

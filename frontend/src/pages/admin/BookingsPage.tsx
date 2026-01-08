@@ -292,7 +292,7 @@ export default function BookingsPage() {
                 <label className="text-sm font-medium text-gray-500">
                   Booking ID
                 </label>
-                <p className="text-lg font-mono text-sm">
+                <p className="font-mono text-sm">
                   {selectedBooking.bookingId || selectedBooking._id}
                 </p>
               </div>

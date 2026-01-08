@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
+import { useAdminLogout } from '../../hooks/useAdminApi';
 
 /**
  * Admin Dashboard Layout
@@ -86,10 +87,13 @@ export default function AdminLayout() {
       >
         {/* Header */}
         <header className="bg-white shadow-sm">
-          <div className="px-8 py-4">
+          <div className="px-8 py-4 flex items-center justify-between">
             <h2 className="text-2xl font-bold text-gray-800">
               {navigation.find(item => isActive(item.path))?.name || 'Dashboard'}
             </h2>
+            <div>
+              <LogoutButton />
+            </div>
           </div>
         </header>
 
@@ -99,5 +103,18 @@ export default function AdminLayout() {
         </div>
       </main>
     </div>
+  );
+}
+
+function LogoutButton() {
+  const logout = useAdminLogout();
+
+  return (
+    <button
+      onClick={() => logout.mutate()}
+      className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
+    >
+      Logout
+    </button>
   );
 }

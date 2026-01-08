@@ -1,10 +1,43 @@
 # AI Voice Restaurant Booking Agent
 
+> **🆕 NEW:** Production-grade features added! Admin authentication, conflict-free booking with time slots, conversation logging, and admin dashboard APIs. See [PRODUCTION_FEATURES.md](PRODUCTION_FEATURES.md) for details.
+
 I built this because I wanted to understand how voice agents actually work without using paid APIs or relying on LLMs. It's a full-stack MERN application where you talk to book a table, and there's an admin panel to manage everything.
 
 The voice agent walks you through a conversation, collects booking details (name, guests, date, time, cuisine), checks the weather to suggest seating, and saves it to MongoDB. Plus there's a complete admin dashboard with charts and export tools.
 
 Building this taught me a lot about browser speech APIs, state machines, handling async operations, and making systems that don't break when APIs fail.
+
+---
+
+## ✨ Production Features (NEW)
+
+### 🔐 Admin Authentication
+- JWT-based secure login
+- bcrypt password hashing
+- Protected routes with middleware
+- **Default credentials:** (seeded admin credentials removed for security). To seed an admin locally set `ALLOW_SEED=true` and run the seed script.
+
+### 📅 Smart Availability Management
+- 30-minute time slots (11 AM - 10 PM)
+- Automatic conflict prevention
+- Alternative slot suggestions when fully booked
+- Admin slot blocking capability
+
+### 📊 Conversation Logging & Analytics
+- Every conversation tracked turn-by-turn
+- Success rate and duration metrics
+- Error tracking for debugging
+- Full transcript history
+
+### 🎛️ Admin Dashboard APIs
+- View conversation logs
+- Confirm/cancel bookings
+- Block specific time slots
+- Real-time statistics
+
+👉 **See [IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md) for architecture details**
+👉 **See [INTEGRATION_GUIDE.md](INTEGRATION_GUIDE.md) for setup instructions**
 
 ---
 
@@ -271,6 +304,28 @@ npm run dev   # from root directory
 - Admin bookings: http://localhost:3001/admin/bookings
 - Admin export: http://localhost:3001/admin/export
 - API: http://localhost:5000/api
+
+---
+
+## 🚀 Deploying to Production
+
+Want to deploy this app? I've got you covered!
+
+**👉 See [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for complete step-by-step instructions.**
+
+**Quick Reference**: [DEPLOYMENT_QUICK_REF.md](DEPLOYMENT_QUICK_REF.md)
+
+**Stack**:
+- Backend: Render (Free tier)
+- Frontend: Vercel (Free tier)
+- Database: MongoDB Atlas
+
+**Before deploying, run**:
+```bash
+node backend/scripts/pre-deploy-check.js
+```
+
+This checks for common issues like exposed secrets and missing .gitignore files.
 
 ---
 

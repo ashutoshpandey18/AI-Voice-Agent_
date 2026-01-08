@@ -5,48 +5,33 @@ import { useAnalytics } from '../../hooks/useAdminApi';
  * Shows key metrics and statistics
  */
 export default function DashboardPage() {
-  const { data, isLoading, error } = useAnalytics();
+  const { data: analytics, isLoading, error } = useAnalytics();
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Loading analytics...</div>
-      </div>
-    );
-  }
+  console.log('Dashboard render:', { analytics, isLoading, error });
 
-  if (error) {
-    return (
-      <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-        Failed to load analytics. Please try again.
-      </div>
-    );
-  }
-
-  const analytics = data?.data;
-
+  // Show dashboard with loading state
   const stats = [
     {
       label: 'Total Bookings',
-      value: analytics?.totalBookings || 0,
+      value: isLoading ? '...' : (analytics?.totalBookings || 0),
       icon: '📋',
       color: 'bg-blue-500',
     },
     {
       label: 'Top Cuisine',
-      value: analytics?.topCuisine || 'N/A',
+      value: isLoading ? '...' : (analytics?.topCuisine || 'N/A'),
       icon: '🍽️',
       color: 'bg-green-500',
     },
     {
       label: 'Peak Hour',
-      value: analytics?.peakHour || 'N/A',
+      value: isLoading ? '...' : (analytics?.peakHour || 'N/A'),
       icon: '⏰',
       color: 'bg-purple-500',
     },
     {
       label: 'Avg Guests',
-      value: analytics?.averageGuestsPerBooking?.toFixed(1) || '0',
+      value: isLoading ? '...' : (analytics?.averageGuestsPerBooking?.toFixed(1) || '0'),
       icon: '👥',
       color: 'bg-orange-500',
     },
@@ -54,6 +39,19 @@ export default function DashboardPage() {
 
   return (
     <div>
+      {/* Error Banner */}
+      {error && (
+        <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+          <h3 className="text-red-800 font-bold mb-2">⚠️ Analytics Error</h3>
+          <p className="text-red-700 text-sm">
+            {error instanceof Error ? error.message : 'Failed to load analytics'}
+          </p>
+          <p className="text-red-600 text-xs mt-2">
+            Check browser console (F12) for details
+          </p>
+        </div>
+      )}
+
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {stats.map((stat, index) => (

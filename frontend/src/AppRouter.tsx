@@ -6,6 +6,8 @@ import DashboardPage from './pages/admin/DashboardPage';
 import BookingsPage from './pages/admin/BookingsPage';
 import AnalyticsPage from './pages/admin/AnalyticsPage';
 import ExportPage from './pages/admin/ExportPage';
+import LoginPage from './pages/admin/LoginPage';
+import ProtectedRoute from './components/ProtectedRoute';
 
 // Create React Query client
 const queryClient = new QueryClient({
@@ -29,12 +31,18 @@ export default function AppRouter() {
           {/* Main Voice Agent App */}
           <Route path="/" element={<App />} />
 
-          {/* Admin Dashboard */}
-          <Route path="/admin" element={<AdminLayout />}>
-            <Route index element={<DashboardPage />} />
-            <Route path="bookings" element={<BookingsPage />} />
-            <Route path="analytics" element={<AnalyticsPage />} />
-            <Route path="export" element={<ExportPage />} />
+          {/* Admin Login - Public */}
+          <Route path="/admin/login" element={<LoginPage />} />
+
+          {/* Admin Dashboard - Protected */}
+          <Route path="/admin" element={<ProtectedRoute />}>
+            <Route element={<AdminLayout />}>
+              <Route index element={<DashboardPage />} />
+              <Route path="dashboard" element={<DashboardPage />} />
+              <Route path="bookings" element={<BookingsPage />} />
+              <Route path="analytics" element={<AnalyticsPage />} />
+              <Route path="export" element={<ExportPage />} />
+            </Route>
           </Route>
         </Routes>
       </BrowserRouter>

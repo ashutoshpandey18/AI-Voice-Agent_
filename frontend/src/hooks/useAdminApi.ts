@@ -30,29 +30,41 @@ async function fetchBookings(filters: BookingFilters) {
     }
   });
 
-  const response = await fetch(`${API_BASE_URL}/admin/bookings?${params}`);
+  const token = localStorage.getItem('admin_token');
+  const response = await fetch(`${API_BASE_URL}/admin/bookings?${params}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {}
+  });
   if (!response.ok) throw new Error('Failed to fetch bookings');
   return response.json();
 }
 
 async function fetchBookingById(id: string) {
-  const response = await fetch(`${API_BASE_URL}/admin/bookings/${id}`);
+  const token = localStorage.getItem('admin_token');
+  const response = await fetch(`${API_BASE_URL}/admin/bookings/${id}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {}
+  });
   if (!response.ok) throw new Error('Failed to fetch booking');
   return response.json();
 }
 
 async function deleteBooking(id: string) {
+  const token = localStorage.getItem('admin_token');
   const response = await fetch(`${API_BASE_URL}/admin/bookings/${id}`, {
-    method: 'DELETE'
+    method: 'DELETE',
+    headers: token ? { Authorization: `Bearer ${token}` } : {}
   });
   if (!response.ok) throw new Error('Failed to delete booking');
   return response.json();
 }
 
 async function updateBookingStatus(id: string, status: string) {
+  const token = localStorage.getItem('admin_token');
   const response = await fetch(`${API_BASE_URL}/admin/bookings/${id}/status`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    },
     body: JSON.stringify({ status })
   });
   if (!response.ok) throw new Error('Failed to update booking status');
@@ -60,13 +72,19 @@ async function updateBookingStatus(id: string, status: string) {
 }
 
 async function fetchAnalytics() {
-  const response = await fetch(`${API_BASE_URL}/admin/analytics`);
+  const token = localStorage.getItem('admin_token');
+  const response = await fetch(`${API_BASE_URL}/admin/analytics`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {}
+  });
   if (!response.ok) throw new Error('Failed to fetch analytics');
   return response.json();
 }
 
 async function fetchCuisines() {
-  const response = await fetch(`${API_BASE_URL}/admin/cuisines`);
+  const token = localStorage.getItem('admin_token');
+  const response = await fetch(`${API_BASE_URL}/admin/cuisines`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {}
+  });
   if (!response.ok) throw new Error('Failed to fetch cuisines');
   return response.json();
 }
@@ -142,3 +160,77 @@ export function useCuisines() {
 }
 
 export { downloadCsv, downloadPdf };
+
+// ============================================
+// Auth API
+// ============================================
+
+async function apiLogin(email: string, password: string) {
+  const res = await fetch(`${API_BASE_URL}/admin/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) throw new Error('Login failed');
+  return res.json();
+}
+
+async function apiGetProfile() {
+  const token = localStorage.getItem('admin_token');
+  const res = await fetch(`${API_BASE_URL}/admin/auth/me`, {
+    headers: { Authorization: token ? `Bearer ${token}` : '' },
+  });
+  if (!res.ok) throw new Error('Failed to fetch profile');
+  return res.json();
+}
+
+async function apiChangePassword(oldPassword: string, newPassword: string) {
+  const token = localStorage.getItem('admin_token');
+  const res = await fetch(`${API_BASE_URL}/admin/auth/change-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
+    body: JSON.stringify({ oldPassword, newPassword }),
+  });
+  if (!res.ok) throw new Error('Failed to change password');
+  return res.json();
+}
+
+async function apiLogout() {
+  const token = localStorage.getItem('admin_token');
+  await fetch(`${API_BASE_URL}/admin/auth/logout`, {
+    method: 'POST',
+    headers: { Authorization: token ? `Bearer ${token}` : '' },
+  });
+  localStorage.removeItem('admin_token');
+}
+
+export function useAdminLogin() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ email, password }: { email: string; password: string }) => apiLogin(email, password),
+    onSuccess: () => {
+      // Token is stored in LoginPage before navigation (to avoid race condition)
+      // Just invalidate profile query here
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+    },
+  });
+}
+
+export function useAdminProfile() {
+  return useQuery({ queryKey: ['profile'], queryFn: apiGetProfile, staleTime: 60000 });
+}
+
+export function useChangePassword() {
+  return useMutation({ mutationFn: ({ oldPassword, newPassword }: { oldPassword: string; newPassword: string }) => apiChangePassword(oldPassword, newPassword) });
+}
+
+export function useAdminLogout() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiLogout(),
+    onSuccess: () => {
+      queryClient.clear();
+      window.location.href = '/admin/login';
+    },
+  });
+}
