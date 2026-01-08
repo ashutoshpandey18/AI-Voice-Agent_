@@ -42,30 +42,30 @@ class SpeechService {
     this.recognition.continuous = true;  // Keep listening continuously
     this.recognition.interimResults = true;  // Show interim results
     this.recognition.lang = 'en-US';
-    this.recognition.maxAlternatives = 1;
+    (this.recognition as any).maxAlternatives = 1;
 
     // Add start event to confirm mic is active
-    this.recognition.onstart = () => {
+    (this.recognition as any).onstart = () => {
       console.log('[SpeechService] ✓ Microphone is now actively listening');
     };
 
     // Add audio start event to confirm voice detection
-    this.recognition.onaudiostart = () => {
+    (this.recognition as any).onaudiostart = () => {
       console.log('[SpeechService] ✓ Audio input detected');
     };
 
     // Add sound start event
-    this.recognition.onsoundstart = () => {
+    (this.recognition as any).onsoundstart = () => {
       console.log('[SpeechService] ✓ Sound detected');
     };
 
     // Add speech start event
-    this.recognition.onspeechstart = () => {
+    (this.recognition as any).onspeechstart = () => {
       console.log('[SpeechService] ✓ Speech detected');
     };
 
     // Use event.resultIndex to get the correct result
-    this.recognition.onresult = (event: SpeechRecognitionEvent) => {
+    (this.recognition as any).onresult = (event: any) => {
       const result = event.results[event.resultIndex];
       const transcript = result[0].transcript.trim();
       const isFinal = result.isFinal;
