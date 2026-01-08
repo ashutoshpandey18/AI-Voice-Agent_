@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "nodemon --exec ts-node src/server.ts",
     "dev:clean": "node scripts/clean-port.js && npm run dev",
+    "prebuild": "npm ci --include=dev || npm install --include=dev",
     "build": "tsc",
     "start": "node dist/server.js",
     "clean": "rimraf dist",
