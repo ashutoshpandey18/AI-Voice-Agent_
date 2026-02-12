@@ -1,16 +1,21 @@
-import { useState, useEffect } from 'react';
-import VoiceButton from './components/VoiceButton';
-import Transcript from './components/Transcript';
-import ChatMessages, { ChatMessage } from './components/ChatMessages';
+import { useState, useEffect, useRef } from 'react';
+import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
+import { Mic, MicOff, ArrowRight, MessageSquare, Brain, BarChart3, ChevronLeft } from 'lucide-react';
 import { speechService } from './services/speechService';
 import { apiService, ConversationSlots, AgentResponse } from './services/apiService';
 
-/**
- * Main App Component
- * Minimal + Interactive Voice Agent Frontend
- */
+interface ChatMessage {
+  id: string;
+  role: 'user' | 'agent';
+  content: string;
+  timestamp: Date;
+}
+
 function App() {
-  // Session ID for conversation tracking
+  const navigate = useNavigate();
+
+  // Session ID
   const [sessionId] = useState(() => `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
 
   // UI State
@@ -26,29 +31,25 @@ function App() {
   const [weatherInfo, setWeatherInfo] = useState<any>(null);
   const [readyToBook, setReadyToBook] = useState(false);
 
-  // Browser support check
+  // Browser support
   const [isSpeechSupported, setIsSpeechSupported] = useState(true);
-
-  //  SESSION FLAG: Prevents duplicate greeting messages
   const [sessionStarted, setSessionStarted] = useState(false);
 
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    //  Only run setup ONCE per session
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  useEffect(() => {
     if (sessionStarted) return;
-
     setSessionStarted(true);
-
-    //  Only check browser support - NO frontend greeting
     if (!speechService.isSupported()) {
       setIsSpeechSupported(false);
       addMessage('agent', 'Sorry, your browser does not support speech recognition. Please use Chrome or Edge.');
     }
-    // Backend will send the greeting as part of the first agent response
   }, [sessionStarted]);
 
-  /**
-   * Add a message to the chat
-   */
   const addMessage = (role: 'user' | 'agent', content: string) => {
     const message: ChatMessage = {
       id: `msg-${Date.now()}-${Math.random()}`,
@@ -59,21 +60,11 @@ function App() {
     setMessages(prev => [...prev, message]);
   };
 
-  /**
-   * Handle voice input start
-   */
   const handleStartListening = () => {
     if (!isSpeechSupported || isProcessing) return;
-
     speechService.startListening(
       (transcript) => {
-        // Only process non-empty transcripts
-        if (!transcript || !transcript.trim()) {
-          console.warn('[App] Empty transcript received, skipping');
-          return;
-        }
-
-        console.log('[App] Processing transcript:', transcript);
+        if (!transcript || !transcript.trim()) return;
         handleFinalTranscript(transcript);
       },
       (error) => {
@@ -82,13 +73,9 @@ function App() {
         addMessage('agent', 'Sorry, I had trouble hearing you. Please try speaking clearly and try again.');
       }
     );
-
     setIsListening(true);
   };
 
-  /**
-   * Handle voice input stop
-   */
   const handleStopListening = () => {
     speechService.setAutoMode(false);
     speechService.stopListening();
@@ -96,92 +83,45 @@ function App() {
     setIsListening(false);
   };
 
-  /**
-   * Handle final transcript and send to backend
-   */
   const handleFinalTranscript = async (text: string) => {
-    // Block empty, undefined, or whitespace-only messages
-    if (!text || !text.trim() || text.trim().length === 0) {
-      console.warn('[App] Empty or invalid message blocked');
-      return;
-    }
-
+    if (!text || !text.trim() || text.trim().length < 2) return;
     const trimmedText = text.trim();
 
-    // Ignore very short meaningless input
-    if (trimmedText.length < 2) {
-      console.warn('[App] Message too short, ignoring');
-      return;
-    }
-
-    // Show transcript in UI
     setTranscript(trimmedText);
     setIsInterim(false);
-
-    // Add user message to chat
     addMessage('user', trimmedText);
-
-    // Reset transcript after a moment
     setTimeout(() => setTranscript(''), 2000);
-
     setIsProcessing(true);
 
     try {
-      // Send message to agent
-      const response: AgentResponse = await apiService.sendMessage(
-        sessionId,
-        trimmedText,
-        slots
-      );
-
-      // Update slots
+      const response: AgentResponse = await apiService.sendMessage(sessionId, trimmedText, slots);
       setSlots(response.slots);
-
-      // Update weather and seating recommendation
-      if (response.weather) {
-        setWeatherInfo(response.weather);
-      }
-      if (response.seatingRecommendation) {
-        setSeatingRecommendation(response.seatingRecommendation);
-      }
-      if (response.readyToBook !== undefined) {
-        setReadyToBook(response.readyToBook);
-      }
-
-      // Add agent response to chat
+      if (response.weather) setWeatherInfo(response.weather);
+      if (response.seatingRecommendation) setSeatingRecommendation(response.seatingRecommendation);
+      if (response.readyToBook !== undefined) setReadyToBook(response.readyToBook);
       addMessage('agent', response.reply);
 
-      // If ready to book, disable auto mode
       if (response.readyToBook) {
         speechService.setAutoMode(false);
         setIsListening(false);
       }
 
       setIsProcessing(false);
-
-      // Speak the response (speechService will auto-restart listening after)
       speechService.speak(response.reply);
-
     } catch (error: any) {
       console.error('API error:', error);
       addMessage('agent', 'Sorry, I encountered an error. Please try again.');
       setIsProcessing(false);
-
-      // Speak error message and continue listening
       speechService.speak('Sorry, I encountered an error. Please try again.');
     }
   };
 
-  /**
-   * Handle booking confirmation
-   */
   const handleConfirmBooking = async () => {
     if (!readyToBook || !slots.customerName || !slots.numberOfGuests || !slots.bookingDate || !slots.bookingTime || !slots.cuisinePreference) {
       addMessage('agent', 'Please provide all required information before confirming.');
       return;
     }
 
-    // Stop continuous mode during booking
     speechService.setAutoMode(false);
     setIsListening(false);
     setIsProcessing(true);
@@ -199,12 +139,9 @@ function App() {
       };
 
       const result = await apiService.createBooking(booking);
+      addMessage('agent', `Excellent! Your booking has been confirmed (ID: ${result.booking.bookingId.slice(0, 8)}). We look forward to seeing you!`);
 
-      addMessage('agent', `🎉 Excellent! Your booking has been confirmed (ID: ${result.booking.bookingId.slice(0, 8)}). We look forward to seeing you!`);
-
-      // Speak confirmation
       speechService.speak('Excellent! Your booking has been confirmed. We look forward to seeing you!', () => {
-        // Reset for new booking after confirmation speech
         setTimeout(() => {
           setSlots({});
           setSeatingRecommendation(null);
@@ -212,17 +149,11 @@ function App() {
           setReadyToBook(false);
           addMessage('agent', 'Would you like to make another reservation?');
           setIsProcessing(false);
-
-          // Ask for new booking
           speechService.speak('Would you like to make another reservation?', () => {
-            if (isSpeechSupported) {
-              // Re-enable auto mode and start listening
-              handleStartListening();
-            }
+            if (isSpeechSupported) handleStartListening();
           });
         }, 2000);
       });
-
     } catch (error: any) {
       console.error('Booking error:', error);
       addMessage('agent', `Failed to create booking: ${error.message}`);
@@ -231,137 +162,297 @@ function App() {
     }
   };
 
+  const slotEntries = Object.entries(slots).filter(([, v]) => v !== undefined && v !== '');
+  const hasSlots = slotEntries.length > 0;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-4xl mx-auto px-4 py-6">
-          <h1 className="text-3xl font-bold text-gray-900 text-center">
-            🎙️ AI Voice Agent
-          </h1>
-          <p className="text-sm text-gray-600 text-center mt-2">
-            Restaurant Booking System
-          </p>
+    <div className="min-h-screen bg-neutral-50 relative">
+      {/* Subtle radial accent behind hero */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-blue-100 rounded-full mix-blend-multiply filter blur-3xl opacity-20 pointer-events-none" />
+
+      {/* Top Navigation */}
+      <nav className="relative z-10 border-b border-neutral-200 bg-white/80 backdrop-blur-sm">
+        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+          <button
+            onClick={() => navigate('/')}
+            className="flex items-center gap-2 text-neutral-600 hover:text-neutral-900 transition-colors text-sm font-medium"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Back
+          </button>
+          <span className="text-sm font-semibold text-neutral-900">Voice Agent</span>
+          <button
+            onClick={() => navigate('/admin/login')}
+            className="text-sm text-neutral-500 hover:text-neutral-900 transition-colors"
+          >
+            Admin
+          </button>
         </div>
-      </header>
+      </nav>
 
-      {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-4 py-8">
-        <div className="space-y-6">
+      <div className="relative z-10 max-w-6xl mx-auto px-6">
+        {/* Hero Block */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="text-center pt-16 pb-10"
+        >
+          <p className="text-xs tracking-widest uppercase text-neutral-500 mb-4">
+            Voice Booking Demo
+          </p>
+          <h1 className="text-4xl md:text-5xl font-semibold text-neutral-900 mb-4 max-w-2xl mx-auto leading-tight">
+            Book a Table by Speaking Naturally
+          </h1>
+          <p className="text-neutral-600 max-w-2xl mx-auto leading-relaxed">
+            A full-stack voice booking system that listens, understands, and confirms reservations through structured conversation — no forms required.
+          </p>
+        </motion.div>
 
-          {/* Voice Button */}
-          <div className="flex justify-center">
-            <VoiceButton
-              isListening={isListening}
-              onStart={handleStartListening}
-              onStop={handleStopListening}
-              disabled={!isSpeechSupported || isProcessing}
-            />
-          </div>
+        {/* Main Product Demo Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.15 }}
+          className="mt-4 mb-16"
+        >
+          <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm overflow-hidden">
+            {/* Card top strip */}
+            <div className="flex items-center justify-between px-6 py-3 border-b border-neutral-100">
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-neutral-900">Voice Booking Agent</span>
+              </div>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-green-50 text-green-700 text-xs font-medium rounded-full border border-green-200">
+                <span className="w-1.5 h-1.5 bg-green-500 rounded-full" />
+                Live Demo
+              </span>
+            </div>
 
-          {/* Transcript Display */}
-          {transcript && (
-            <Transcript text={transcript} isInterim={isInterim} />
-          )}
-
-          {/* Booking Info Card */}
-          {Object.keys(slots).length > 0 && (
-            <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
-                Booking Details
-              </h2>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                {slots.customerName && (
-                  <div>
-                    <span className="text-gray-500">Name:</span>
-                    <span className="ml-2 font-medium text-gray-900">{slots.customerName}</span>
-                  </div>
-                )}
-                {slots.numberOfGuests && (
-                  <div>
-                    <span className="text-gray-500">Guests:</span>
-                    <span className="ml-2 font-medium text-gray-900">{slots.numberOfGuests}</span>
-                  </div>
-                )}
-                {slots.bookingDate && (
-                  <div>
-                    <span className="text-gray-500">Date:</span>
-                    <span className="ml-2 font-medium text-gray-900">{slots.bookingDate}</span>
-                  </div>
-                )}
-                {slots.bookingTime && (
-                  <div>
-                    <span className="text-gray-500">Time:</span>
-                    <span className="ml-2 font-medium text-gray-900">{slots.bookingTime}</span>
-                  </div>
-                )}
-                {slots.cuisinePreference && (
-                  <div>
-                    <span className="text-gray-500">Cuisine:</span>
-                    <span className="ml-2 font-medium text-gray-900">{slots.cuisinePreference}</span>
-                  </div>
-                )}
-                {seatingRecommendation && (
-                  <div>
-                    <span className="text-gray-500">Seating:</span>
-                    <span className="ml-2 font-medium text-gray-900 capitalize">{seatingRecommendation}</span>
-                  </div>
-                )}
+            <div className="p-6 md:p-8">
+              {/* Mic Button */}
+              <div className="flex flex-col items-center mb-8">
+                <motion.button
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.96 }}
+                  onClick={isListening ? handleStopListening : handleStartListening}
+                  disabled={!isSpeechSupported || isProcessing}
+                  className={`relative w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm ${
+                    isListening
+                      ? 'bg-red-500 hover:bg-red-600'
+                      : 'bg-neutral-900 hover:bg-neutral-800'
+                  } ${(!isSpeechSupported || isProcessing) ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
+                >
+                  {isListening ? (
+                    <MicOff className="w-8 h-8 text-white" />
+                  ) : (
+                    <Mic className="w-8 h-8 text-white" />
+                  )}
+                  {isListening && (
+                    <span className="absolute inset-0 rounded-full bg-red-400 animate-ping opacity-40" />
+                  )}
+                </motion.button>
+                <p className="mt-3 text-sm text-neutral-500">
+                  {isProcessing
+                    ? 'Processing...'
+                    : isListening
+                      ? 'Listening -- tap to stop'
+                      : 'Tap to start speaking'}
+                </p>
               </div>
 
-              {weatherInfo && (
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                  <p className="text-xs text-blue-600 font-medium mb-1">Weather Forecast</p>
-                  <p className="text-sm text-blue-900">
-                    {weatherInfo.description} • {weatherInfo.temperature}°C
+              {/* Transcript */}
+              {transcript && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mb-6 p-4 bg-neutral-50 rounded-xl border border-neutral-100"
+                >
+                  <p className="text-xs font-medium text-neutral-400 mb-1">
+                    {isInterim ? 'Listening...' : 'You said:'}
+                  </p>
+                  <p className={`text-sm ${isInterim ? 'text-neutral-400 italic' : 'text-neutral-900'}`}>
+                    {transcript}
+                  </p>
+                </motion.div>
+              )}
+
+              {/* Booking Slots Card */}
+              {hasSlots && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mb-6 p-5 bg-neutral-50 rounded-xl border border-neutral-200"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-semibold text-neutral-900">Booking Details</h3>
+                    {readyToBook && (
+                      <span className="text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded border border-green-200">
+                        Ready
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2 text-sm">
+                    {slots.customerName && (
+                      <div>
+                        <span className="text-neutral-400">Name</span>
+                        <p className="font-medium text-neutral-900">{slots.customerName}</p>
+                      </div>
+                    )}
+                    {slots.numberOfGuests && (
+                      <div>
+                        <span className="text-neutral-400">Guests</span>
+                        <p className="font-medium text-neutral-900">{slots.numberOfGuests}</p>
+                      </div>
+                    )}
+                    {slots.bookingDate && (
+                      <div>
+                        <span className="text-neutral-400">Date</span>
+                        <p className="font-medium text-neutral-900">{slots.bookingDate}</p>
+                      </div>
+                    )}
+                    {slots.bookingTime && (
+                      <div>
+                        <span className="text-neutral-400">Time</span>
+                        <p className="font-medium text-neutral-900">{slots.bookingTime}</p>
+                      </div>
+                    )}
+                    {slots.cuisinePreference && (
+                      <div>
+                        <span className="text-neutral-400">Cuisine</span>
+                        <p className="font-medium text-neutral-900">{slots.cuisinePreference}</p>
+                      </div>
+                    )}
+                    {seatingRecommendation && (
+                      <div>
+                        <span className="text-neutral-400">Seating</span>
+                        <p className="font-medium text-neutral-900 capitalize">{seatingRecommendation}</p>
+                      </div>
+                    )}
+                  </div>
+                  {weatherInfo && (
+                    <div className="mt-3 pt-3 border-t border-neutral-200 text-sm">
+                      <span className="text-neutral-400">Weather</span>
+                      <p className="font-medium text-neutral-900">
+                        {weatherInfo.description} / {weatherInfo.temperature}C
+                      </p>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+
+              {/* Conversation Panel */}
+              <div className="bg-neutral-50 rounded-xl border border-neutral-200 overflow-hidden">
+                <div className="px-4 py-3 border-b border-neutral-100">
+                  <p className="text-xs font-medium text-neutral-400 uppercase tracking-wide">
+                    Conversation
+                  </p>
+                </div>
+                <div className="max-h-80 overflow-y-auto p-4">
+                  {messages.length === 0 ? (
+                    <div className="py-12 text-center">
+                      <MessageSquare className="w-10 h-10 text-neutral-200 mx-auto mb-3" />
+                      <p className="text-sm text-neutral-400">
+                        No messages yet. Tap the mic to start a conversation.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {messages.map((msg) => (
+                        <div
+                          key={msg.id}
+                          className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                        >
+                          <div
+                            className={`max-w-[80%] px-4 py-2.5 rounded-xl text-sm leading-relaxed ${
+                              msg.role === 'user'
+                                ? 'bg-neutral-900 text-white'
+                                : 'bg-white border border-neutral-200 text-neutral-900'
+                            }`}
+                          >
+                            <p>{msg.content}</p>
+                            <p className={`text-xs mt-1 ${msg.role === 'user' ? 'text-neutral-400' : 'text-neutral-300'}`}>
+                              {msg.timestamp.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                      <div ref={messagesEndRef} />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Confirm Booking Button */}
+              {readyToBook && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-6 flex justify-center"
+                >
+                  <motion.button
+                    whileHover={{ y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleConfirmBooking}
+                    disabled={isProcessing}
+                    className="px-8 py-3 bg-neutral-900 text-white font-medium rounded-lg shadow-sm hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+                  >
+                    {isProcessing ? 'Processing...' : 'Confirm Booking'}
+                    {!isProcessing && <ArrowRight className="w-4 h-4" />}
+                  </motion.button>
+                </motion.div>
+              )}
+
+              {/* Browser Warning */}
+              {!isSpeechSupported && (
+                <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-center">
+                  <p className="text-sm text-amber-800">
+                    Speech recognition is not supported in this browser. Please use Chrome or Edge.
                   </p>
                 </div>
               )}
             </div>
-          )}
+          </div>
+        </motion.div>
 
-          {/* Chat Messages */}
-          <ChatMessages messages={messages} />
-
-          {/* Confirm Button */}
-          {readyToBook && (
-            <div className="flex justify-center">
-              <button
-                onClick={handleConfirmBooking}
-                disabled={isProcessing}
-                className="
-                  px-8 py-4 bg-secondary text-white font-semibold rounded-lg
-                  shadow-lg hover:bg-secondary/90 transition-all duration-200
-                  disabled:opacity-50 disabled:cursor-not-allowed
-                  flex items-center gap-2
-                "
+        {/* Feature Grid */}
+        <div className="pb-24">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[
+              {
+                icon: <MessageSquare className="w-6 h-6 text-neutral-700" />,
+                title: 'Voice Conversation Engine',
+                desc: 'Structured dialogue flow that collects booking details through natural conversation.',
+              },
+              {
+                icon: <Brain className="w-6 h-6 text-neutral-700" />,
+                title: 'Rule-Based NLP Extraction',
+                desc: 'Deterministic entity parsing for dates, times, guest counts, and cuisine preferences.',
+              },
+              {
+                icon: <BarChart3 className="w-6 h-6 text-neutral-700" />,
+                title: 'Admin Analytics Dashboard',
+                desc: 'Real-time booking metrics, conversation logs, and system health monitoring.',
+              },
+            ].map((feature, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.4, delay: i * 0.1 }}
+                whileHover={{ y: -4 }}
+                className="p-6 bg-white rounded-xl border border-neutral-200 hover:shadow-md transition-all duration-300"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                {isProcessing ? 'Processing...' : 'Confirm Booking'}
-              </button>
-            </div>
-          )}
-
-          {/* Browser Support Warning */}
-          {!isSpeechSupported && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
-              <p className="text-sm text-yellow-800">
-                ⚠️ Speech recognition is not supported in this browser. Please use Chrome or Edge for the best experience.
-              </p>
-            </div>
-          )}
+                <div className="w-10 h-10 rounded-lg bg-neutral-100 flex items-center justify-center mb-4">
+                  {feature.icon}
+                </div>
+                <h3 className="text-base font-semibold text-neutral-900 mb-1">{feature.title}</h3>
+                <p className="text-sm text-neutral-500 leading-relaxed">{feature.desc}</p>
+              </motion.div>
+            ))}
+          </div>
         </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="mt-12 pb-6 text-center text-sm text-gray-500">
-        <p>Powered by Web Speech API & AI</p>
-      </footer>
+      </div>
     </div>
   );
 }

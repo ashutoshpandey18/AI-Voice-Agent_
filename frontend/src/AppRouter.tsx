@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
+import LandingPage from './pages/LandingPage';
 import AdminLayout from './pages/admin/AdminLayout';
 import DashboardPage from './pages/admin/DashboardPage';
 import BookingsPage from './pages/admin/BookingsPage';
@@ -28,8 +29,11 @@ export default function AppRouter() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Routes>
+          {/* Landing Page */}
+          <Route path="/" element={<LandingPage />} />
+
           {/* Main Voice Agent App */}
-          <Route path="/" element={<App />} />
+          <Route path="/demo" element={<App />} />
 
           {/* Admin Login - Public */}
           <Route path="/admin/login" element={<LoginPage />} />

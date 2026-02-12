@@ -54,10 +54,10 @@ git commit -m "fix: remove .env files from tracking"
    Region: Ohio (US East)
    Branch: master
    Root Directory: backend
-   
+
    Build Command: npm install && npm run build
    Start Command: npm start
-   
+
    Environment: Node
    Plan: Free
    ```
@@ -91,7 +91,7 @@ git commit -m "fix: remove .env files from tracking"
    ```
    Framework Preset: Vite
    Root Directory: frontend
-   
+
    Build Command: npm run build
    Output Directory: dist
    ```
@@ -102,7 +102,7 @@ git commit -m "fix: remove .env files from tracking"
    VITE_APP_NAME=AI Voice Agent
    VITE_ENABLE_ADMIN_DASHBOARD=true
    ```
-   
+
    ⚠️ Replace `YOUR-RENDER-URL-FROM-STEP-2` with actual URL from Step 2!
 
 7. **Click**: "Deploy"

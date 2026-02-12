@@ -74,7 +74,7 @@ if (envExampleExists) {
 // Check 6: No hardcoded secrets in server.ts
 console.log('\n🔒 Checking for hardcoded secrets...');
 const serverContent = fs.readFileSync(path.join(__dirname, 'src/server.ts'), 'utf-8');
-const hasHardcodedSecrets = 
+const hasHardcodedSecrets =
   serverContent.includes('mongodb://') && !serverContent.includes('process.env.MONGO_URI') ||
   serverContent.includes('Bearer ') && !serverContent.includes('process.env');
 

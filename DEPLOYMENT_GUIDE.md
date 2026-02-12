@@ -105,7 +105,7 @@ ALLOW_SEED=false
 SESSION_SECRET=your-super-secret-session-key-change-this-in-production
 ```
 
-**⚠️ IMPORTANT**: 
+**⚠️ IMPORTANT**:
 - Replace `https://your-app-name.vercel.app` with your actual Vercel URL (we'll get this in Phase 3)
 - Keep all other values as shown above
 
